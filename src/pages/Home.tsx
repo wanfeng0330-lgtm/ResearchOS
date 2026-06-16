@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, FileText, X, Sparkles, BookOpen, PenTool, ShieldCheck, BarChart3, ScanSearch, Languages } from "lucide-react";
+import { Plus, FileText, X, Sparkles, BookOpen, PenTool, ShieldCheck, BarChart3, ScanSearch, Languages, Database, Workflow, Brain, Eye, Zap, ArrowRight } from "lucide-react";
 import useAppStore from "@/store/useAppStore";
 import ParticleBackground from "@/components/ParticleBackground";
 import { createProject, fetchProjects } from "@/utils/api";
@@ -113,6 +113,95 @@ export default function Home() {
             <Sparkles size={18} />
             开始新项目
           </motion.button>
+        </div>
+      </section>
+
+      <section className="bg-ivory/50 border-y border-navy-100">
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <motion.h2
+            className="section-title text-center mb-3"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            为什么选择 ResearchOS
+          </motion.h2>
+          <motion.p
+            className="text-center text-navy-400 text-sm mb-10 max-w-lg mx-auto"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            从文献检索到论文成稿，全流程 AI 驱动，每一步都在你的掌控之中
+          </motion.p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[
+              {
+                icon: Database,
+                badge: "7源并行",
+                title: "跨数据库智能检索",
+                desc: "同时检索 OpenAlex、CrossRef、PubMed、Semantic Scholar、bioRxiv、arXiv 六大数据库，AI 四维评分筛选最相关文献",
+                highlights: ["95篇初筛 → Top30精选", "关键词×主题×方法×贡献四维评分", "Unpaywall 开放获取PDF补充"],
+                gradient: "from-blue-600 to-cyan-500",
+              },
+              {
+                icon: Workflow,
+                badge: "6步向导",
+                title: "交互式论文撰写",
+                desc: "关键词提取 → 文献检索 → 观点提取 → 大纲生成 → 论文撰写 → 完成，每步审核确认，支持回溯修改",
+                highlights: ["每步暂停等待用户确认", "支持回溯到任意步骤修改", "DeepSeek Flash + Mimo 双模型协作"],
+                gradient: "from-violet-600 to-purple-500",
+              },
+              {
+                icon: Brain,
+                badge: "双模型架构",
+                title: "三层 LLM 智能调度",
+                desc: "Heavy(Mimo) / Medium(DeepSeek-Pro) / Light(DeepSeek Flash) 三层模型，自动降级保证可用性",
+                highlights: ["观点提取+论文撰写用 Mimo", "关键词+检索+大纲用 DeepSeek Flash", "API Key 未配置时自动降级"],
+                gradient: "from-amber-500 to-orange-500",
+              },
+              {
+                icon: Eye,
+                badge: "AIGC降痕",
+                title: "6大人性化改写技术",
+                desc: "打破句式模式、注入独有细节、AI高频词替换、引入受控不完美、打破逻辑模板、段落结构变化",
+                highlights: ["提示词集成到写作流程", "前端实时展示检测结果", "无需额外运行降痕逻辑"],
+                gradient: "from-emerald-500 to-teal-500",
+              },
+            ].map((item, i) => (
+              <motion.div
+                key={item.title}
+                className="bg-white rounded-xl p-6 border border-navy-100 shadow-sm hover:shadow-md transition-shadow duration-300"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.1 }}
+              >
+                <div className="flex items-start gap-4 mb-4">
+                  <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${item.gradient} flex items-center justify-center shrink-0`}>
+                    <item.icon size={22} className="text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r ${item.gradient} text-white`}>
+                        {item.badge}
+                      </span>
+                      <h3 className="font-serif font-semibold text-navy-700">{item.title}</h3>
+                    </div>
+                    <p className="text-sm text-navy-400 leading-relaxed">{item.desc}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 ml-15">
+                  {item.highlights.map((h) => (
+                    <span key={h} className="text-xs text-navy-500 bg-navy-50 px-2.5 py-1 rounded-full border border-navy-100">
+                      {h}
+                    </span>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </section>
 

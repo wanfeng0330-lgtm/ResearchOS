@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Globe, Download, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { Globe, Download, ChevronLeft, ChevronRight, AlertCircle, X } from "lucide-react";
 import useAppStore from "@/store/useAppStore";
 import StepSidebar from "@/components/StepSidebar";
 import StepKeywords from "@/components/steps/StepKeywords";
@@ -46,6 +46,7 @@ export default function Project() {
   }, [id, project, addProject]);
 
   const [isRunning, setIsRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [mainKeywords, setMainKeywords] = useState<string[]>([]);
   const [secondaryKeywords, setSecondaryKeywords] = useState<string[]>([]);
   const [researchFields, setResearchFields] = useState<string[]>([]);
@@ -58,6 +59,7 @@ export default function Project() {
   const handleRunKeywords = useCallback(async () => {
     if (!id || !project) return;
     setIsRunning(true);
+    setError(null);
     setWizardStepStatus(1, "running");
     try {
       const result = await stepKeywords({
@@ -71,7 +73,9 @@ export default function Project() {
       setKeywords(result.keywords);
       setWizardStepStatus(1, "review");
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "关键词提取失败，请重试";
       console.error("Keywords step failed:", err);
+      setError(msg);
       setWizardStepStatus(1, "pending");
     } finally {
       setIsRunning(false);
@@ -81,6 +85,7 @@ export default function Project() {
   const handleRunSearch = useCallback(async () => {
     if (!id || !project) return;
     setIsRunning(true);
+    setError(null);
     setWizardStepStatus(2, "running");
     try {
       const result = await stepSearch({
@@ -91,7 +96,9 @@ export default function Project() {
       setPapers(result.papers);
       setWizardStepStatus(2, "review");
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "文献检索失败，请重试";
       console.error("Search step failed:", err);
+      setError(msg);
       setWizardStepStatus(2, "pending");
     } finally {
       setIsRunning(false);
@@ -101,6 +108,7 @@ export default function Project() {
   const handleRunExtract = useCallback(async () => {
     if (!id || !project) return;
     setIsRunning(true);
+    setError(null);
     setWizardStepStatus(3, "running");
     try {
       const selectedPaperIds = papers.filter(p => p.selected).map(p => p.id);
@@ -113,7 +121,9 @@ export default function Project() {
       selectAllViewpoints();
       setWizardStepStatus(3, "review");
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "观点提取失败，请重试";
       console.error("Extract step failed:", err);
+      setError(msg);
       setWizardStepStatus(3, "pending");
     } finally {
       setIsRunning(false);
@@ -123,6 +133,7 @@ export default function Project() {
   const handleRunOutline = useCallback(async () => {
     if (!id || !project) return;
     setIsRunning(true);
+    setError(null);
     setWizardStepStatus(4, "running");
     try {
       const selectedVps = viewpoints.filter((_, i) => selectedViewpointIndices.has(i));
@@ -142,7 +153,9 @@ export default function Project() {
       })));
       setWizardStepStatus(4, "review");
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "大纲生成失败，请重试";
       console.error("Outline step failed:", err);
+      setError(msg);
       setWizardStepStatus(4, "pending");
     } finally {
       setIsRunning(false);
@@ -152,6 +165,7 @@ export default function Project() {
   const handleRunWrite = useCallback(async () => {
     if (!id || !project) return;
     setIsRunning(true);
+    setError(null);
     setWizardStepStatus(5, "running");
     try {
       const selectedVps = viewpoints.filter((_, i) => selectedViewpointIndices.has(i));
@@ -172,7 +186,9 @@ export default function Project() {
       setAigcPatternCount(result.aigcPatternCount);
       setWizardStepStatus(5, "review");
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "论文撰写失败，请重试";
       console.error("Write step failed:", err);
+      setError(msg);
       setWizardStepStatus(5, "pending");
     } finally {
       setIsRunning(false);
@@ -327,6 +343,22 @@ export default function Project() {
         <StepSidebar currentStep={wizardStep} stepStatuses={wizardStepStatuses} onStepClick={handleStepClick} />
 
         <div className="flex-1 flex flex-col overflow-hidden">
+          {error && (
+            <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+              <AlertCircle size={18} className="text-red-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-red-700">{error}</p>
+                {error.includes("API key") && (
+                  <p className="text-xs text-red-500 mt-1">
+                    请检查 <code className="bg-red-100 px-1 rounded">.env</code> 文件中的 API Key 配置是否正确。
+                  </p>
+                )}
+              </div>
+              <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                <X size={16} />
+              </button>
+            </div>
+          )}
           {wizardStep === 1 && (
             <StepKeywords
               projectId={id!} topic={project.topic} description={project.description}

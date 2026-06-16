@@ -33,17 +33,17 @@ router.post('/keywords', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const project = projectService.getProject(projectId)
+  const project = await projectService.getProject(projectId)
   if (!project) {
     res.status(404).json({ success: false, error: 'Project not found' })
     return
   }
 
   try {
-    projectService.setProgress(projectId, { stage: 'keyword_extracting', progress: 5, message: '正在提取研究关键词...' })
+    await projectService.setProgress(projectId, { stage: 'keyword_extracting', progress: 5, message: '正在提取研究关键词...' })
     const result = await keywordAgent.execute(topic, description || '')
     const allKeywords = [...result.mainKeywords, ...result.secondaryKeywords]
-    projectService.setKeywords(projectId, allKeywords)
+    await projectService.setKeywords(projectId, allKeywords)
 
     const lang: 'en' | 'zh' = language || 'zh'
     const wordCount = totalWordCount || 5000
@@ -65,7 +65,7 @@ router.post('/keywords', async (req: Request, res: Response): Promise<void> => {
       config = await sectionPlanner.execute(topic, description || '', wordCount, lang)
     }
 
-    projectService.setSectionConfig(projectId, config)
+    await projectService.setSectionConfig(projectId, config)
 
     const totalPlannedWords = config.reduce((sum, section) => sum + section.wordCount, 0)
     if (totalPlannedWords > 0 && wordCount > 0) {
@@ -75,9 +75,9 @@ router.post('/keywords', async (req: Request, res: Response): Promise<void> => {
         wordCount: Math.max(100, Math.round(section.wordCount * ratio)),
       }))
     }
-    projectService.setSectionConfig(projectId, config)
+    await projectService.setSectionConfig(projectId, config)
 
-    projectService.setStepData(projectId, 'keywords', {
+    await projectService.setStepData(projectId, 'keywords', {
       keywords: allKeywords,
       mainKeywords: result.mainKeywords,
       secondaryKeywords: result.secondaryKeywords,
@@ -85,7 +85,7 @@ router.post('/keywords', async (req: Request, res: Response): Promise<void> => {
       sectionConfig: config,
     })
 
-    projectService.setProgress(projectId, {
+    await projectService.setProgress(projectId, {
       stage: 'keyword_extracting',
       progress: 12,
       message: `已提取 ${allKeywords.length} 个关键词，规划 ${config.length} 个章节`,
@@ -120,38 +120,38 @@ router.post('/search', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const project = projectService.getProject(projectId)
+  const project = await projectService.getProject(projectId)
   if (!project) {
     res.status(404).json({ success: false, error: 'Project not found' })
     return
   }
 
   try {
-    projectService.setProgress(projectId, { stage: 'searching', progress: 15, message: '正在检索学术文献...' })
+    await projectService.setProgress(projectId, { stage: 'searching', progress: 15, message: '正在检索学术文献...' })
 
-    const searchKeywords = keywords || projectService.getKeywords(projectId)
+    const searchKeywords = keywords || await projectService.getKeywords(projectId)
     const searchTopic = topic || project.topic
     const papers = await searchAgent.execute(searchTopic, searchKeywords)
-    projectService.addPapers(projectId, papers)
+    await projectService.addPapers(projectId, papers)
 
-    const allPapers = projectService.getPapers(projectId)
+    const allPapers = await projectService.getPapers(projectId)
     paperLibraryService.assignCitationNumbers(projectId, allPapers)
 
-    for (const paper of projectService.getPapers(projectId)) {
+    for (const paper of await projectService.getPapers(projectId)) {
       if ((paper.relevanceScore || 0) >= 0.5) {
         paper.selected = true
       }
     }
 
-    projectService.setProgress(projectId, { stage: 'parsing', progress: 30, message: '正在解析文献元数据...' })
-    const enriched = await parseAgent.execute(projectService.getPapers(projectId))
-    projectService.addPapers(projectId, enriched)
+    await projectService.setProgress(projectId, { stage: 'parsing', progress: 30, message: '正在解析文献元数据...' })
+    const enriched = await parseAgent.execute(await projectService.getPapers(projectId))
+    await projectService.addPapers(projectId, enriched)
 
-    const finalPapers = projectService.getPapers(projectId)
+    const finalPapers = await projectService.getPapers(projectId)
     const selectedCount = finalPapers.filter(p => p.selected).length
 
-    projectService.setStepData(projectId, 'search', { papers: finalPapers })
-    projectService.setProgress(projectId, {
+    await projectService.setStepData(projectId, 'search', { papers: finalPapers })
+    await projectService.setProgress(projectId, {
       stage: 'parsing',
       progress: 38,
       message: `检索到 ${finalPapers.length} 篇文献，已筛选 ${selectedCount} 篇`,
@@ -180,21 +180,21 @@ router.post('/extract', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const project = projectService.getProject(projectId)
+  const project = await projectService.getProject(projectId)
   if (!project) {
     res.status(404).json({ success: false, error: 'Project not found' })
     return
   }
 
   try {
-    projectService.setProgress(projectId, { stage: 'extracting', progress: 40, message: '正在提取研究观点...' })
+    await projectService.setProgress(projectId, { stage: 'extracting', progress: 40, message: '正在提取研究观点...' })
 
-    let papersToUse = projectService.getSelectedPapers(projectId)
+    let papersToUse = await projectService.getSelectedPapers(projectId)
     if (papersToUse.length === 0) {
-      papersToUse = projectService.getPapers(projectId)
+      papersToUse = await projectService.getPapers(projectId)
     }
     if (paperIds && paperIds.length > 0) {
-      const allPapers = projectService.getPapers(projectId)
+      const allPapers = await projectService.getPapers(projectId)
       papersToUse = allPapers.filter(p => paperIds.includes(p.id))
     }
 
@@ -205,8 +205,8 @@ router.post('/extract', async (req: Request, res: Response): Promise<void> => {
 
     const viewpoints = await extractAgent.execute(papersToUse, topic || project.topic)
 
-    projectService.setStepData(projectId, 'extract', { viewpoints })
-    projectService.setProgress(projectId, {
+    await projectService.setStepData(projectId, 'extract', { viewpoints })
+    await projectService.setProgress(projectId, {
       stage: 'extracting',
       progress: 48,
       message: `已提取 ${viewpoints.length} 个观点`,
@@ -239,18 +239,18 @@ router.post('/outline', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const project = projectService.getProject(projectId)
+  const project = await projectService.getProject(projectId)
   if (!project) {
     res.status(404).json({ success: false, error: 'Project not found' })
     return
   }
 
   try {
-    projectService.setProgress(projectId, { stage: 'extracting', progress: 49, message: '正在基于观点生成论文大纲...' })
+    await projectService.setProgress(projectId, { stage: 'extracting', progress: 49, message: '正在基于观点生成论文大纲...' })
 
-    let viewpointsToUse = viewpoints || projectService.getViewpoints(projectId)
+    let viewpointsToUse = viewpoints || await projectService.getViewpoints(projectId)
     if (viewpointsToUse.length === 0) {
-      const stepData = projectService.getStepData(projectId, 'extract')
+      const stepData = await projectService.getStepData(projectId, 'extract')
       if (stepData && typeof stepData === 'object' && stepData !== null && 'viewpoints' in stepData) {
         viewpointsToUse = (stepData as { viewpoints: string[] }).viewpoints
       }
@@ -272,15 +272,15 @@ router.post('/outline', async (req: Request, res: Response): Promise<void> => {
       wordCount: s.wordCount,
       order: s.order,
     }))
-    projectService.setSectionConfig(projectId, sectionConfig)
+    await projectService.setSectionConfig(projectId, sectionConfig)
 
-    projectService.setStepData(projectId, 'outline', {
+    await projectService.setStepData(projectId, 'outline', {
       sections: result.sections,
       totalWordCount: result.totalWordCount,
       rationale: result.rationale,
     })
 
-    projectService.setProgress(projectId, {
+    await projectService.setProgress(projectId, {
       stage: 'extracting',
       progress: 50,
       message: `已生成 ${result.sections.length} 个章节的大纲`,
@@ -322,7 +322,7 @@ router.post('/write', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const project = projectService.getProject(projectId)
+  const project = await projectService.getProject(projectId)
   if (!project) {
     res.status(404).json({ success: false, error: 'Project not found' })
     return
@@ -337,24 +337,24 @@ router.post('/write', async (req: Request, res: Response): Promise<void> => {
 
     let config = sectionConfig && sectionConfig.length > 0
       ? sectionConfig
-      : projectService.getSectionConfig(projectId)
+      : await projectService.getSectionConfig(projectId)
     if (config.length === 0) {
       config = DEFAULT_SECTIONS
     }
-    projectService.setSectionConfig(projectId, config)
+    await projectService.setSectionConfig(projectId, config)
 
-    let papersToUse = projectService.getSelectedPapers(projectId)
+    let papersToUse = await projectService.getSelectedPapers(projectId)
     if (papersToUse.length === 0) {
-      papersToUse = projectService.getPapers(projectId)
+      papersToUse = await projectService.getPapers(projectId)
     }
     if (paperIds && paperIds.length > 0) {
-      const allPapers = projectService.getPapers(projectId)
+      const allPapers = await projectService.getPapers(projectId)
       papersToUse = allPapers.filter(p => paperIds.includes(p.id))
     }
 
-    let viewpointsToUse = viewpoints || projectService.getViewpoints(projectId)
+    let viewpointsToUse = viewpoints || await projectService.getViewpoints(projectId)
     if (viewpointsToUse.length === 0) {
-      const stepData = projectService.getStepData(projectId, 'extract')
+      const stepData = await projectService.getStepData(projectId, 'extract')
       if (stepData && typeof stepData === 'object' && stepData !== null && 'viewpoints' in stepData) {
         viewpointsToUse = (stepData as { viewpoints: string[] }).viewpoints
       }
@@ -365,8 +365,8 @@ router.post('/write', async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    projectService.setProgress(projectId, { stage: 'writing', progress: 50, message: '正在撰写论文...' })
-    projectService.updateProjectStatus(projectId, 'generating')
+    await projectService.setProgress(projectId, { stage: 'writing', progress: 50, message: '正在撰写论文...' })
+    await projectService.updateProjectStatus(projectId, 'generating')
 
     const generatedSections = await writingAgent.execute(
       viewpointsToUse, project.topic, format, papersToUse, config, lang,
@@ -379,14 +379,14 @@ router.post('/write', async (req: Request, res: Response): Promise<void> => {
       },
       wordCount, pType
     )
-    projectService.setGeneratedSections(projectId, generatedSections.map(s => ({ ...s, projectId })))
+    await projectService.setGeneratedSections(projectId, generatedSections.map(s => ({ ...s, projectId })))
 
-    projectService.setProgress(projectId, { stage: 'citing', progress: 70, message: '正在格式化引用...' })
+    await projectService.setProgress(projectId, { stage: 'citing', progress: 70, message: '正在格式化引用...' })
     const citeResult = await citationAgent.execute(generatedSections, papersToUse, format)
-    projectService.setGeneratedSections(projectId, citeResult.sections.map(s => ({ ...s, projectId })))
-    projectService.setReferences(projectId, citeResult.references)
+    await projectService.setGeneratedSections(projectId, citeResult.sections.map(s => ({ ...s, projectId })))
+    await projectService.setReferences(projectId, citeResult.references)
 
-    projectService.setProgress(projectId, { stage: 'integrity_reviewing', progress: 79, message: '正在审核完整性...' })
+    await projectService.setProgress(projectId, { stage: 'integrity_reviewing', progress: 79, message: '正在审核完整性...' })
     const integrityReport = await integrityAgent.execute(citeResult.sections, papersToUse, citeResult.references)
 
     let aigcPatternCount = 0
@@ -398,7 +398,7 @@ router.post('/write', async (req: Request, res: Response): Promise<void> => {
       }
     } catch { /* ignore */ }
 
-    projectService.setProgress(projectId, { stage: 'charting', progress: 86, message: '正在生成图表...' })
+    await projectService.setProgress(projectId, { stage: 'charting', progress: 86, message: '正在生成图表...' })
     const charts = await chartAgent.execute(citeResult.sections, papersToUse, project.topic)
     const sortedSections = [...citeResult.sections].sort((a, b) => a.order - b.order)
     const sectionIndexMap = new Map(sortedSections.map((s, i) => [s.order, i]))
@@ -410,12 +410,12 @@ router.post('/write', async (req: Request, res: Response): Promise<void> => {
       const idx = sectionIndexMap.get(s.order)
       return { ...s, charts: idx === undefined ? [] : updatedCharts.filter(c => c.position === idx) }
     })
-    projectService.setGeneratedSections(projectId, updatedSections.map(s => ({ ...s, projectId })))
+    await projectService.setGeneratedSections(projectId, updatedSections.map(s => ({ ...s, projectId })))
 
-    projectService.setProgress(projectId, { stage: 'formatting', progress: 92, message: '正在排版...' })
+    await projectService.setProgress(projectId, { stage: 'formatting', progress: 92, message: '正在排版...' })
     const formatResult = await formatAgent.execute(updatedSections, citeResult.references, toc)
 
-    projectService.setStepData(projectId, 'write', {
+    await projectService.setStepData(projectId, 'write', {
       sections: updatedSections,
       references: citeResult.references,
       integrityReport,
@@ -423,12 +423,12 @@ router.post('/write', async (req: Request, res: Response): Promise<void> => {
       formattedContent: formatResult.content,
     })
 
-    projectService.setProgress(projectId, {
+    await projectService.setProgress(projectId, {
       stage: 'formatting', progress: 100,
       message: '论文撰写完成',
       partialContent: formatResult.content,
     })
-    projectService.updateProjectStatus(projectId, 'completed')
+    await projectService.updateProjectStatus(projectId, 'completed')
 
     res.json({
       success: true,
@@ -442,12 +442,12 @@ router.post('/write', async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error'
     console.error('[StepWrite] Error:', msg)
-    projectService.updateProjectStatus(projectId, 'draft')
+    await projectService.updateProjectStatus(projectId, 'draft')
     res.status(500).json({ success: false, error: msg })
   }
 })
 
-router.post('/confirm', (req: Request, res: Response): void => {
+router.post('/confirm', async (req: Request, res: Response): Promise<void> => {
   const { projectId, step, data } = req.body as {
     projectId: string
     step: number
@@ -467,26 +467,26 @@ router.post('/confirm', (req: Request, res: Response): void => {
   }
 
   if (data) {
-    projectService.setStepData(projectId, stepName, data)
+    await projectService.setStepData(projectId, stepName, data)
   }
 
   if (step === 1 && data?.keywords) {
-    projectService.setKeywords(projectId, data.keywords as string[])
+    await projectService.setKeywords(projectId, data.keywords as string[])
   }
   if (step === 1 && data?.sectionConfig) {
-    projectService.setSectionConfig(projectId, data.sectionConfig as SectionConfig[])
+    await projectService.setSectionConfig(projectId, data.sectionConfig as SectionConfig[])
   }
   if (step === 2 && data?.selectedPaperIds) {
-    projectService.selectPapersByIds(projectId, data.selectedPaperIds as string[])
+    await projectService.selectPapersByIds(projectId, data.selectedPaperIds as string[])
   }
   if (step === 3 && data?.viewpoints) {
-    projectService.setViewpoints(projectId, data.viewpoints as string[])
+    await projectService.setViewpoints(projectId, data.viewpoints as string[])
   }
 
   res.json({ success: true })
 })
 
-router.post('/rollback', (req: Request, res: Response): void => {
+router.post('/rollback', async (req: Request, res: Response): Promise<void> => {
   const { projectId, step } = req.body as { projectId: string; step: number }
 
   if (!projectId || !step) {
@@ -494,7 +494,7 @@ router.post('/rollback', (req: Request, res: Response): void => {
     return
   }
 
-  projectService.clearStepDataAfter(projectId, step)
+  await projectService.clearStepDataAfter(projectId, step)
 
   const clearedSteps = []
   const stepNames = ['keywords', 'search', 'extract', 'outline', 'write', 'complete']

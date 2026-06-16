@@ -11,26 +11,26 @@ interface LinkParams extends ProjectParams {
 
 const router = Router({ mergeParams: true })
 
-router.get('/', (req: Request<ProjectParams>, res: Response) => {
+router.get('/', async (req: Request<ProjectParams>, res: Response) => {
   const { projectId } = req.params
-  const chain = citationChainService.getChain(projectId)
+  const chain = await citationChainService.getChain(projectId)
   res.json({ success: true, data: chain })
 })
 
-router.post('/link', (req: Request<ProjectParams>, res: Response) => {
+router.post('/link', async (req: Request<ProjectParams>, res: Response) => {
   const { projectId } = req.params
   const { paperId, sectionId, context } = req.body
   if (!paperId || !sectionId) {
     res.status(400).json({ success: false, error: 'paperId and sectionId are required' })
     return
   }
-  const link = citationChainService.addLink(projectId, paperId, sectionId, context || '')
+  const link = await citationChainService.addLink(projectId, paperId, sectionId, context || '')
   res.status(201).json({ success: true, data: link })
 })
 
-router.delete('/link/:linkId', (req: Request<LinkParams>, res: Response) => {
+router.delete('/link/:linkId', async (req: Request<LinkParams>, res: Response) => {
   const { projectId, linkId } = req.params
-  const deleted = citationChainService.removeLink(projectId, linkId)
+  const deleted = await citationChainService.removeLink(projectId, linkId)
   if (!deleted) {
     res.status(404).json({ success: false, error: 'Link not found' })
     return

@@ -5,6 +5,7 @@ import WorkspaceDetail from "@/pages/WorkspaceDetail";
 import Project from "@/pages/Project";
 import Library from "@/pages/Library";
 import Export from "@/pages/Export";
+import Auth from "@/pages/Auth";
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <Sidebar />
         <Routes>
           <Route path="/" element={<WorkspaceDashboard />} />
+          <Route path="/auth" element={<Auth />} />
           <Route path="/workspace/:id" element={<WorkspaceDetail />} />
           <Route path="/project/:id" element={<Project />} />
           <Route path="/library" element={<Library />} />

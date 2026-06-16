@@ -1,0 +1,281 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ResearchFlow API",
+    "version": "1.0.0",
+    "description": "AI-driven academic research workflow platform API"
+  },
+  "servers": [
+    { "url": "http://localhost:3001", "description": "Development" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Project": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "topic": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "type": "string", "enum": ["draft", "searching", "parsing", "generating", "completed"] },
+          "language": { "type": "string", "enum": ["en", "zh"] },
+          "keywords": { "type": "array", "items": { "type": "string" } },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Paper": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "authors": { "type": "array", "items": { "type": "string" } },
+          "year": { "type": "integer" },
+          "abstract": { "type": "string" },
+          "source": { "type": "string" },
+          "selected": { "type": "boolean" },
+          "relevanceScore": { "type": "number" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [false] },
+          "error": { "type": "string" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string", "minLength": 6 },
+                  "name": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "User created" },
+          "400": { "description": "Validation error" },
+          "409": { "description": "Email already registered" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login and get JWT token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful, returns token and user" },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get current user info",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "User info" },
+          "401": { "description": "Not authenticated" }
+        }
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "tags": ["Projects"],
+        "summary": "List all projects",
+        "responses": { "200": { "description": "Project list" } }
+      },
+      "post": {
+        "tags": ["Projects"],
+        "summary": "Create a new project",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["topic"],
+                "properties": {
+                  "topic": { "type": "string" },
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "language": { "type": "string", "enum": ["en", "zh"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Project created" } }
+      }
+    },
+    "/api/projects/{id}": {
+      "get": {
+        "tags": ["Projects"],
+        "summary": "Get project details with papers, sections, references",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Project details" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/api/search": {
+      "post": {
+        "tags": ["Search"],
+        "summary": "Search academic papers across multiple sources",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": { "type": "string" },
+                  "sources": { "type": "array", "items": { "type": "string" } },
+                  "maxResults": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Search results" } }
+      }
+    },
+    "/api/generate/step/keywords": {
+      "post": {
+        "tags": ["Generation"],
+        "summary": "Step 1: Extract keywords from topic",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "topic"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "topic": { "type": "string" },
+                  "language": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Keywords extracted" } }
+      }
+    },
+    "/api/generate/step/write": {
+      "post": {
+        "tags": ["Generation"],
+        "summary": "Step 5: Generate paper content",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "citationFormat": { "type": "string", "enum": ["bibtex", "gbt", "apa", "ieee"] },
+                  "language": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Paper generated" } }
+      }
+    },
+    "/api/export": {
+      "post": {
+        "tags": ["Export"],
+        "summary": "Export document in specified format",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["projectId", "format", "citationFormat"],
+                "properties": {
+                  "projectId": { "type": "string" },
+                  "format": { "type": "string", "enum": ["docx", "pdf", "latex"] },
+                  "citationFormat": { "type": "string", "enum": ["bibtex", "gbt", "apa", "ieee"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Export job created" } }
+      }
+    },
+    "/api/workspaces": {
+      "get": {
+        "tags": ["Workspaces"],
+        "summary": "List all workspaces",
+        "responses": { "200": { "description": "Workspace list" } }
+      },
+      "post": {
+        "tags": ["Workspaces"],
+        "summary": "Create a new workspace",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": { "name": { "type": "string" }, "description": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Workspace created" } }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check with dependency status",
+        "responses": { "200": { "description": "System healthy" }, "503": { "description": "System degraded" } }
+      }
+    }
+  }
+}

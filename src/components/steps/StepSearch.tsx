@@ -20,6 +20,21 @@ export default function StepSearch({ isRunning, onRun, papers, onTogglePaper, on
   const [extDoi, setExtDoi] = useState("");
 
   const selectedCount = papers.filter(p => p.selected).length;
+  const sourceCounts = papers.reduce((acc, p) => {
+    acc[p.source] = (acc[p.source] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const sourceLabels: Record<string, string> = {
+    arxiv: 'arXiv',
+    semantic_scholar: 'Semantic Scholar',
+    crossref: 'CrossRef',
+    openalex: 'OpenAlex',
+    pubmed: 'PubMed',
+    biorxiv: 'bioRxiv',
+    unpaywall: 'Unpaywall',
+    openalex_fallback: 'OpenAlex(降级)',
+  };
 
   const handleAddExternal = () => {
     if (!extTitle.trim()) return;
@@ -49,7 +64,8 @@ export default function StepSearch({ isRunning, onRun, papers, onTogglePaper, on
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <h2 className="font-serif text-xl font-semibold text-navy-700 mb-2">第二步：文献检索</h2>
-          <p className="text-sm text-navy-400 mb-6">AI 将根据关键词在学术数据库中检索相关文献</p>
+          <p className="text-sm text-navy-400 mb-2">AI 将在 4 个学术数据库中检索文献</p>
+          <p className="text-xs text-navy-300 mb-6">OpenAlex · CrossRef · PubMed · Semantic Scholar · bioRxiv · arXiv → AI筛选Top30</p>
           <button onClick={onRun} className="btn-primary flex items-center gap-2 mx-auto">
             开始检索文献
           </button>
@@ -63,18 +79,28 @@ export default function StepSearch({ isRunning, onRun, papers, onTogglePaper, on
       {isRunning && (
         <div className="px-6 py-3 bg-cyan/5 border-b border-cyan/10 flex items-center gap-3 text-cyan">
           <Loader2 size={18} className="animate-spin" />
-          <span className="text-sm font-medium">正在检索和解析文献...</span>
+          <span className="text-sm font-medium">正在检索文献：4源各25篇 → AI四维评分筛选Top30...</span>
         </div>
       )}
 
       <div className="px-6 py-3 border-b border-navy-100 flex items-center justify-between bg-ivory/50">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm font-medium text-navy-600">
-            检索到 {papers.length} 篇文献
+            {papers.length} 篇文献（AI筛选Top30）
           </span>
           <span className="text-xs text-cyan bg-cyan/10 px-2 py-0.5 rounded-full">
             已选 {selectedCount} 篇
           </span>
+          {Object.entries(sourceCounts).map(([source, count]) => (
+            <span key={source} className="text-xs text-navy-400 bg-navy-50 px-2 py-0.5 rounded-full">
+              {sourceLabels[source] || source}: {count}
+            </span>
+          ))}
+          {papers.length > 0 && (
+            <span className="text-xs text-navy-300">
+              评分: 关键词×0.25 + 主题×0.35 + 方法×0.20 + 贡献×0.20
+            </span>
+          )}
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}

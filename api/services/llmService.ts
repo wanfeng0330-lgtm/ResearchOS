@@ -70,7 +70,7 @@ export async function callLLM(prompt: string, systemPrompt?: string, options?: {
         'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-v4-pro',
+        model: 'deepseek-v4-flash',
         messages,
         temperature,
         max_tokens: maxTokens,
@@ -81,6 +81,13 @@ export async function callLLM(prompt: string, systemPrompt?: string, options?: {
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`[LLM] DeepSeek API error: ${response.status} - ${errorText}`)
+      // On 401/402 auth/payment failure, fallback to callTieredLLM which can try other tiers
+      if (response.status === 401 || response.status === 402) {
+        console.warn(`[LLM] DeepSeek failed (${response.status}), falling back to tiered LLM (heavy tier)`)
+        clearTimeout(timeout)
+        semaphore.release()
+        return callTieredLLM(prompt, systemPrompt, 'heavy', options)
+      }
       throw new Error(`DeepSeek API error: ${response.status} - ${errorText}`)
     }
 
@@ -142,6 +149,13 @@ export async function callLightLLM(prompt: string, systemPrompt?: string, option
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`[LightLLM] Volcengine API error: ${response.status} - ${errorText}`)
+      // On 401/402 auth/payment failure, fallback to callTieredLLM
+      if (response.status === 401 || response.status === 402) {
+        console.warn(`[LightLLM] Volcengine failed (${response.status}), falling back to tiered LLM`)
+        clearTimeout(timeout)
+        semaphore.release()
+        return callTieredLLM(prompt, systemPrompt, 'medium', options)
+      }
       throw new Error(`Volcengine API error: ${response.status} - ${errorText}`)
     }
 
@@ -212,7 +226,7 @@ export async function streamLLM(
         'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-v4-pro',
+        model: 'deepseek-v4-flash',
         messages,
         temperature: 0.7,
         max_tokens: 8192,
@@ -286,7 +300,7 @@ function getTierConfig(tier: LLMTier): TierConfig {
     medium: {
       baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
       apiKey: process.env.DEEPSEEK_API_KEY || '',
-      model: 'deepseek-v4-pro',
+      model: process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-v4-flash',
       maxTokens: 4096,
       temperature: 0.5,
       timeout: 180000,
@@ -294,13 +308,29 @@ function getTierConfig(tier: LLMTier): TierConfig {
     light: {
       baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
       apiKey: process.env.DEEPSEEK_API_KEY || '',
-      model: process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-chat',
-      maxTokens: 2048,
+      model: process.env.DEEPSEEK_FLASH_MODEL || 'deepseek-v4-flash',
+      maxTokens: 4096,
       temperature: 0.3,
       timeout: 120000,
     },
   }
   return configs[tier]
+}
+
+function getFallbackOrder(tier: LLMTier): LLMTier[] {
+  return tier === 'light'
+    ? ['medium', 'heavy']
+    : tier === 'heavy'
+      ? ['medium', 'light']
+      : ['heavy', 'light']
+}
+
+function isAuthError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const msg = error.message
+    return msg.includes('401') || msg.includes('402') || msg.includes('Authentication Fails') || msg.includes('invalid_request_error')
+  }
+  return false
 }
 
 export async function callTieredLLM(
@@ -313,11 +343,7 @@ export async function callTieredLLM(
   let config = getTierConfig(tier)
 
   if (!config.apiKey) {
-    const fallbackOrder: LLMTier[] = tier === 'light'
-      ? ['medium', 'heavy']
-      : tier === 'heavy'
-        ? ['medium', 'light']
-        : ['heavy', 'light']
+    const fallbackOrder = getFallbackOrder(tier)
 
     for (const fallback of fallbackOrder) {
       const fallbackConfig = getTierConfig(fallback)
@@ -369,17 +395,33 @@ export async function callTieredLLM(
 
     if (!response.ok) {
       const errorText = await response.text()
-      throw new Error(`${tier} tier API error: ${response.status} - ${errorText}`)
+      const apiError = new Error(`${effectiveTier} tier API error: ${response.status} - ${errorText}`)
+
+      // On auth errors (401) or payment errors (402), try fallback tiers
+      if (response.status === 401 || response.status === 402) {
+        const fallbackOrder = getFallbackOrder(effectiveTier)
+        for (const fallback of fallbackOrder) {
+          const fallbackConfig = getTierConfig(fallback)
+          if (fallbackConfig.apiKey && fallbackConfig.apiKey !== config.apiKey) {
+            console.warn(`[TieredLLM] ${effectiveTier} tier auth failed (401), falling back to ${fallback} tier`)
+            clearTimeout(timeout)
+            semaphore.release()
+            return callTieredLLM(prompt, systemPrompt, fallback, options)
+          }
+        }
+      }
+
+      throw apiError
     }
 
     const data = await response.json()
     const content = data.choices?.[0]?.message?.content || ''
-    console.log(`[TieredLLM] ${tier} tier response received, length: ${content.length}`)
+    console.log(`[TieredLLM] ${effectiveTier} tier response received, length: ${content.length}`)
     setCached(prompt, content, systemPrompt, { ...options, maxTokens, temperature })
     return content
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`${tier} tier request timed out after ${config.timeout / 1000}s`)
+      throw new Error(`${effectiveTier} tier request timed out after ${config.timeout / 1000}s`)
     }
     throw error
   } finally {

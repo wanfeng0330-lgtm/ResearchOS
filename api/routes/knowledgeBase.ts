@@ -11,18 +11,18 @@ interface EntryParams extends ProjectParams {
 
 const router = Router({ mergeParams: true })
 
-router.get('/', (req: Request<ProjectParams>, res: Response) => {
+router.get('/', async (req: Request<ProjectParams>, res: Response) => {
   const { projectId } = req.params
-  const entries = knowledgeBaseService.getEntries(projectId)
+  const entries = await knowledgeBaseService.getEntries(projectId)
   res.json({ success: true, data: entries })
 })
 
-router.get('/viewpoints', (req: Request<ProjectParams>, res: Response) => {
+router.get('/viewpoints', async (req: Request<ProjectParams>, res: Response) => {
   const { projectId } = req.params
   const { sectionType } = req.query
   const viewpoints = sectionType
-    ? knowledgeBaseService.getViewpointsBySectionType(projectId, sectionType as string)
-    : knowledgeBaseService.getEntriesByType(projectId, 'viewpoint')
+    ? await knowledgeBaseService.getViewpointsBySectionType(projectId, sectionType as string)
+    : await knowledgeBaseService.getEntriesByType(projectId, 'viewpoint')
   res.json({ success: true, data: viewpoints })
 })
 
@@ -33,7 +33,7 @@ router.post('/summarize', async (req: Request<ProjectParams>, res: Response) => 
     res.status(400).json({ success: false, error: 'paperId is required' })
     return
   }
-  const existing = knowledgeBaseService.getSummary(projectId, paperId)
+  const existing = await knowledgeBaseService.getSummary(projectId, paperId)
   if (existing) {
     res.json({ success: true, data: existing })
     return
@@ -41,20 +41,20 @@ router.post('/summarize', async (req: Request<ProjectParams>, res: Response) => 
   res.json({ success: true, data: null, message: 'Summary generation will be implemented in Phase 2' })
 })
 
-router.post('/notes', (req: Request<ProjectParams>, res: Response) => {
+router.post('/notes', async (req: Request<ProjectParams>, res: Response) => {
   const { projectId } = req.params
   const { content, sourcePaperIds } = req.body
   if (!content?.trim()) {
     res.status(400).json({ success: false, error: 'Content is required' })
     return
   }
-  const entry = knowledgeBaseService.addNote(projectId, content.trim(), sourcePaperIds)
+  const entry = await knowledgeBaseService.addNote(projectId, content.trim(), sourcePaperIds)
   res.status(201).json({ success: true, data: entry })
 })
 
-router.delete('/entries/:entryId', (req: Request<EntryParams>, res: Response) => {
+router.delete('/entries/:entryId', async (req: Request<EntryParams>, res: Response) => {
   const { projectId, entryId } = req.params
-  const deleted = knowledgeBaseService.deleteEntry(projectId, entryId)
+  const deleted = await knowledgeBaseService.deleteEntry(projectId, entryId)
   if (!deleted) {
     res.status(404).json({ success: false, error: 'Entry not found' })
     return

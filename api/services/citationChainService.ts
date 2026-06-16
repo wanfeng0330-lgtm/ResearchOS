@@ -3,11 +3,11 @@ import type { CitationChainLink } from '../../shared/types.js'
 
 const citationChains = new Map<string, CitationChainLink[]>()
 
-export function getChain(projectId: string): CitationChainLink[] {
+export async function getChain(projectId: string): Promise<CitationChainLink[]> {
   return citationChains.get(projectId) || []
 }
 
-export function addLink(projectId: string, paperId: string, sectionId: string, context: string): CitationChainLink {
+export async function addLink(projectId: string, paperId: string, sectionId: string, context: string): Promise<CitationChainLink> {
   const chain = citationChains.get(projectId) || []
   const link: CitationChainLink = {
     id: uuidv4(),
@@ -22,7 +22,7 @@ export function addLink(projectId: string, paperId: string, sectionId: string, c
   return link
 }
 
-export function removeLink(projectId: string, linkId: string): boolean {
+export async function removeLink(projectId: string, linkId: string): Promise<boolean> {
   const chain = citationChains.get(projectId) || []
   const index = chain.findIndex(l => l.id === linkId)
   if (index < 0) return false
@@ -30,15 +30,15 @@ export function removeLink(projectId: string, linkId: string): boolean {
   return true
 }
 
-export function getLinksByPaper(projectId: string, paperId: string): CitationChainLink[] {
+export async function getLinksByPaper(projectId: string, paperId: string): Promise<CitationChainLink[]> {
   return (citationChains.get(projectId) || []).filter(l => l.paperId === paperId)
 }
 
-export function getLinksBySection(projectId: string, sectionId: string): CitationChainLink[] {
+export async function getLinksBySection(projectId: string, sectionId: string): Promise<CitationChainLink[]> {
   return (citationChains.get(projectId) || []).filter(l => l.sectionId === sectionId)
 }
 
-export function rebuildChainFromSections(projectId: string, sections: Array<{ id: string; content: string; citations: Array<{ paperId: string }> }>): void {
+export async function rebuildChainFromSections(projectId: string, sections: Array<{ id: string; content: string; citations: Array<{ paperId: string }> }>): Promise<void> {
   const chain: CitationChainLink[] = []
   for (const section of sections) {
     for (const citation of section.citations) {
@@ -57,6 +57,6 @@ export function rebuildChainFromSections(projectId: string, sections: Array<{ id
   citationChains.set(projectId, chain)
 }
 
-export function clearChain(projectId: string): void {
+export async function clearChain(projectId: string): Promise<void> {
   citationChains.delete(projectId)
 }

@@ -1,4 +1,17 @@
-import { pgTable, uuid, text, integer, timestamp, jsonb, boolean, real, varchar, index } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, integer, timestamp, jsonb, boolean, real, varchar, index, unique } from 'drizzle-orm/pg-core'
+
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 255 }).notNull(),
+  passwordHash: text('password_hash').notNull(),
+  name: varchar('name', { length: 255 }).default(''),
+  role: varchar('role', { length: 20 }).default('user').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique('users_email_unique').on(table.email),
+  index('idx_users_email').on(table.email),
+])
 
 export const workspaces = pgTable('workspaces', {
   id: uuid('id').primaryKey().defaultRandom(),

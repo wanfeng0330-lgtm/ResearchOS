@@ -26,14 +26,14 @@ router.post('/related-work', async (req: Request, res: Response): Promise<void> 
     return
   }
 
-  const project = projectService.getProject(projectId)
+  const project = await projectService.getProject(projectId)
   if (!project) {
     res.status(404).json({ success: false, error: 'Project not found' })
     return
   }
 
   if (paperIds && paperIds.length > 0) {
-    projectService.selectPapersByIds(projectId, paperIds)
+    await projectService.selectPapersByIds(projectId, paperIds)
   }
 
   const format: CitationFormat = citationFormat || 'gbt'
@@ -45,7 +45,7 @@ router.post('/related-work', async (req: Request, res: Response): Promise<void> 
   const wordCount = totalWordCount || 5000
   const pType: PaperType = paperType || 'graduation'
 
-  projectService.setSectionConfig(projectId, config)
+  await projectService.setSectionConfig(projectId, config)
 
   orchestrator
     .orchestrate(projectId, project.topic, desc, format, config, autoSelect, lang, toc, wordCount, pType)
@@ -62,10 +62,10 @@ router.post('/related-work', async (req: Request, res: Response): Promise<void> 
   })
 })
 
-router.get('/progress/:projectId', (req: Request, res: Response): void => {
-  const progress = projectService.getProgress(req.params.projectId)
-  const project = projectService.getProject(req.params.projectId)
-  const papers = projectService.getPapers(req.params.projectId)
+router.get('/progress/:projectId', async (req: Request, res: Response): Promise<void> => {
+  const progress = await projectService.getProgress(req.params.projectId)
+  const project = await projectService.getProject(req.params.projectId)
+  const papers = await projectService.getPapers(req.params.projectId)
 
   res.json({
     success: true,

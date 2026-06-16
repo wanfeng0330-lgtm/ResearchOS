@@ -1,7 +1,14 @@
 import { sql } from 'drizzle-orm'
 import db, { client } from './index.js'
 
+const DB_ENABLED = process.env.DB_ENABLED !== 'false'
+
 export async function initializeDatabase(): Promise<void> {
+  if (!DB_ENABLED) {
+    console.log('[DB] Database disabled, skipping initialization')
+    return
+  }
+
   console.log('[DB] Initializing database...')
 
   try {
@@ -172,6 +179,11 @@ export async function initializeDatabase(): Promise<void> {
 }
 
 export async function closeDatabase(): Promise<void> {
+  if (!DB_ENABLED) {
+    console.log('[DB] Database disabled, no connection to close')
+    return
+  }
+  
   await client.end()
   console.log('[DB] Connection closed')
 }

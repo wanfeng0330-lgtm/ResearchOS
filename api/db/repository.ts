@@ -1,6 +1,31 @@
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, count } from 'drizzle-orm'
 import db from './index.js'
 import * as schema from './schema.js'
+
+export const userRepo = {
+  async create(data: { email: string; passwordHash: string; name?: string; role?: string }) {
+    const [result] = await db.insert(schema.users).values(data).returning()
+    return result
+  },
+
+  async findById(id: string) {
+    const [result] = await db.select().from(schema.users).where(eq(schema.users.id, id))
+    return result || null
+  },
+
+  async findByEmail(email: string) {
+    const [result] = await db.select().from(schema.users).where(eq(schema.users.email, email))
+    return result || null
+  },
+
+  async update(id: string, data: Partial<{ name: string; role: string; passwordHash: string }>) {
+    const [result] = await db.update(schema.users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.users.id, id))
+      .returning()
+    return result || null
+  },
+}
 
 export const workspaceRepo = {
   async create(data: { name: string; description?: string; settings?: Record<string, unknown> }) {
@@ -10,6 +35,12 @@ export const workspaceRepo = {
 
   async findAll() {
     return await db.select().from(schema.workspaces).orderBy(desc(schema.workspaces.updatedAt))
+  },
+
+  async findAllPaginated(limit: number, offset: number) {
+    const rows = await db.select().from(schema.workspaces).orderBy(desc(schema.workspaces.updatedAt)).limit(limit).offset(offset)
+    const [{ value: total }] = await db.select({ value: count() }).from(schema.workspaces)
+    return { rows, total }
   },
 
   async findById(id: string) {
@@ -39,6 +70,12 @@ export const projectRepo = {
 
   async findAll() {
     return await db.select().from(schema.projects).orderBy(desc(schema.projects.updatedAt))
+  },
+
+  async findAllPaginated(limit: number, offset: number) {
+    const rows = await db.select().from(schema.projects).orderBy(desc(schema.projects.updatedAt)).limit(limit).offset(offset)
+    const [{ value: total }] = await db.select({ value: count() }).from(schema.projects)
+    return { rows, total }
   },
 
   async findById(id: string) {
@@ -191,6 +228,11 @@ export const knowledgeRepo = {
       .where(eq(schema.knowledgeEntries.id, id))
       .returning()
     return result.length > 0
+  },
+
+  async deleteByProject(projectId: string) {
+    await db.delete(schema.knowledgeEntries)
+      .where(eq(schema.knowledgeEntries.projectId, projectId))
   },
 }
 

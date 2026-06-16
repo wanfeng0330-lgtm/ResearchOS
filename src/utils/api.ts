@@ -2,15 +2,40 @@ import type {
   CitationChainLink, CitationFormat, ExportFormat, GeneratedSection,
   GenerationProgress, KnowledgeEntry, Paper, PaperType, Project, Reference,
   SectionConfig, WorkflowState, Workspace, StepKeywordsData, StepSearchData,
-  StepExtractData, StepOutlineData, StepWriteData,
+  StepExtractData, StepOutlineData, StepWriteData, User,
 } from "../../shared/types";
 
 const API_BASE = "/api";
 
+// Token management
+function getToken(): string | null {
+  return localStorage.getItem('auth_token');
+}
+
+export function setToken(token: string) {
+  localStorage.setItem('auth_token', token);
+}
+
+export function clearToken() {
+  localStorage.removeItem('auth_token');
+}
+
+export function isLoggedIn(): boolean {
+  return !!getToken();
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options?.headers as Record<string, string> || {}),
+  };
+  const token = getToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   const res = await fetch(`${API_BASE}${url}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -252,4 +277,36 @@ export async function uploadImage(file: File): Promise<{ url: string; filename: 
   if (!res.ok) throw new Error('Upload failed');
   const json = await res.json();
   return json.data;
+}
+
+// Auth API
+export async function register(email: string, password: string, name?: string) {
+  return request<{ id: string; email: string; name: string; role: string }>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, name }),
+  });
+}
+
+export async function login(email: string, password: string) {
+  const result = await request<{ token: string; user: User }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+  setToken(result.token);
+  return result;
+}
+
+export async function logout() {
+  await request<{ message: string }>('/auth/logout', { method: 'POST' });
+  clearToken();
+}
+
+export async function getCurrentUser() {
+  return request<User>('/auth/me');
+}
+
+// Health check
+export async function checkHealth() {
+  const res = await fetch(`${API_BASE}/health`);
+  return res.json();
 }

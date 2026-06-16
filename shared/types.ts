@@ -1,3 +1,10 @@
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'user' | 'premium';
+}
+
 export interface Project {
   id: string;
   workspaceId?: string;
@@ -39,7 +46,7 @@ export interface Paper {
   authors: string[];
   year: number;
   abstract: string;
-  source: "arxiv" | "semantic_scholar" | "crossref";
+  source: "arxiv" | "semantic_scholar" | "crossref" | "openalex" | "pubmed" | "biorxiv" | "unpaywall";
   sourceId: string;
   pdfUrl?: string;
   citationCount?: number;
@@ -242,6 +249,21 @@ export interface StepOutlineData {
   sections: OutlineSection[]
   totalWordCount: number
   rationale: string
+}
+
+export interface PaginationParams {
+  page: number;
+  limit: number;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface StepWriteData {

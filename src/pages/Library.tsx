@@ -10,9 +10,13 @@ type ViewMode = "card" | "table";
 
 const sourceOptions: { value: Paper["source"] | "all"; label: string }[] = [
   { value: "all", label: "全部来源" },
-  { value: "arxiv", label: "arXiv" },
-  { value: "semantic_scholar", label: "Semantic Scholar" },
+  { value: "openalex", label: "OpenAlex" },
   { value: "crossref", label: "CrossRef" },
+  { value: "pubmed", label: "PubMed" },
+  { value: "semantic_scholar", label: "Semantic Scholar" },
+  { value: "biorxiv", label: "bioRxiv" },
+  { value: "arxiv", label: "arXiv" },
+  { value: "unpaywall", label: "Unpaywall" },
 ];
 
 const sortOptions: { value: SortKey; label: string }[] = [

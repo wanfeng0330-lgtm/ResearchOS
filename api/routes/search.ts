@@ -25,19 +25,19 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 })
 
-router.post('/select', (req: Request, res: Response): void => {
+router.post('/select', async (req: Request, res: Response): Promise<void> => {
   const { projectId, paperIds } = req.body
   if (!projectId || !Array.isArray(paperIds)) {
     res.status(400).json({ success: false, error: 'projectId and paperIds are required' })
     return
   }
-  const project = projectService.getProject(projectId)
+  const project = await projectService.getProject(projectId)
   if (!project) {
     res.status(404).json({ success: false, error: 'Project not found' })
     return
   }
-  projectService.selectPapersByIds(projectId, paperIds)
-  const papers = projectService.getPapers(projectId)
+  await projectService.selectPapersByIds(projectId, paperIds)
+  const papers = await projectService.getPapers(projectId)
   res.json({ success: true, data: papers })
 })
 

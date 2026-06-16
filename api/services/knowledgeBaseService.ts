@@ -1,17 +1,45 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { KnowledgeEntry } from '../../shared/types.js'
+import { DB_ENABLED } from '../db/index.js'
+import { knowledgeRepo } from '../db/repository.js'
 
+// In-memory fallback storage (used when DB is disabled)
 const knowledgeEntries = new Map<string, KnowledgeEntry[]>()
 
-export function getEntries(projectId: string): KnowledgeEntry[] {
+// Helper to convert DB knowledge entry result to shared KnowledgeEntry type
+function toKnowledgeEntry(row: any): KnowledgeEntry {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    type: row.type,
+    content: row.content,
+    sourcePaperIds: row.sourcePaperIds || [],
+    sectionType: row.sectionType ?? undefined,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+  }
+}
+
+export async function getEntries(projectId: string): Promise<KnowledgeEntry[]> {
+  if (DB_ENABLED) {
+    const rows = await knowledgeRepo.findByProject(projectId)
+    return rows.map(toKnowledgeEntry)
+  }
   return knowledgeEntries.get(projectId) || []
 }
 
-export function getEntriesByType(projectId: string, type: KnowledgeEntry['type']): KnowledgeEntry[] {
+export async function getEntriesByType(projectId: string, type: KnowledgeEntry['type']): Promise<KnowledgeEntry[]> {
+  if (DB_ENABLED) {
+    const rows = await knowledgeRepo.findByType(projectId, type)
+    return rows.map(toKnowledgeEntry)
+  }
   return (knowledgeEntries.get(projectId) || []).filter(e => e.type === type)
 }
 
-export function addEntry(projectId: string, type: KnowledgeEntry['type'], content: string, sourcePaperIds: string[] = [], sectionType?: string): KnowledgeEntry {
+export async function addEntry(projectId: string, type: KnowledgeEntry['type'], content: string, sourcePaperIds: string[] = [], sectionType?: string): Promise<KnowledgeEntry> {
+  if (DB_ENABLED) {
+    const row = await knowledgeRepo.create({ projectId, type, content, sourcePaperIds, sectionType })
+    return toKnowledgeEntry(row)
+  }
   const entries = knowledgeEntries.get(projectId) || []
   const entry: KnowledgeEntry = {
     id: uuidv4(),
@@ -27,24 +55,35 @@ export function addEntry(projectId: string, type: KnowledgeEntry['type'], conten
   return entry
 }
 
-export function addViewpoints(projectId: string, viewpoints: string[], sourcePaperIds: string[] = [], sectionType?: string): KnowledgeEntry[] {
-  return viewpoints.map(vp => addEntry(projectId, 'viewpoint', vp, sourcePaperIds, sectionType))
+export async function addViewpoints(projectId: string, viewpoints: string[], sourcePaperIds: string[] = [], sectionType?: string): Promise<KnowledgeEntry[]> {
+  const results: KnowledgeEntry[] = []
+  for (const vp of viewpoints) {
+    results.push(await addEntry(projectId, 'viewpoint', vp, sourcePaperIds, sectionType))
+  }
+  return results
 }
 
-export function addSummary(projectId: string, paperId: string, content: string): KnowledgeEntry {
+export async function addSummary(projectId: string, paperId: string, content: string): Promise<KnowledgeEntry> {
   return addEntry(projectId, 'summary', content, [paperId])
 }
 
-export function getSummary(projectId: string, paperId: string): KnowledgeEntry | null {
-  const entries = knowledgeEntries.get(projectId) || []
-  return entries.find(e => e.type === 'summary' && e.sourcePaperIds.includes(paperId)) || null
+export async function getSummary(projectId: string, paperId: string): Promise<KnowledgeEntry | null> {
+  if (DB_ENABLED) {
+    const rows = await knowledgeRepo.findByType(projectId, 'summary')
+    const match = rows.find(e => (e.sourcePaperIds || []).includes(paperId))
+    return match ? toKnowledgeEntry(match) : null
+  }
+  return (knowledgeEntries.get(projectId) || []).find(e => e.type === 'summary' && e.sourcePaperIds.includes(paperId)) || null
 }
 
-export function addNote(projectId: string, content: string, sourcePaperIds: string[] = []): KnowledgeEntry {
+export async function addNote(projectId: string, content: string, sourcePaperIds: string[] = []): Promise<KnowledgeEntry> {
   return addEntry(projectId, 'note', content, sourcePaperIds)
 }
 
-export function deleteEntry(projectId: string, entryId: string): boolean {
+export async function deleteEntry(projectId: string, entryId: string): Promise<boolean> {
+  if (DB_ENABLED) {
+    return knowledgeRepo.delete(entryId)
+  }
   const entries = knowledgeEntries.get(projectId) || []
   const index = entries.findIndex(e => e.id === entryId)
   if (index < 0) return false
@@ -52,11 +91,21 @@ export function deleteEntry(projectId: string, entryId: string): boolean {
   return true
 }
 
-export function getViewpointsBySectionType(projectId: string, sectionType: string): KnowledgeEntry[] {
+export async function getViewpointsBySectionType(projectId: string, sectionType: string): Promise<KnowledgeEntry[]> {
+  if (DB_ENABLED) {
+    const rows = await knowledgeRepo.findByType(projectId, 'viewpoint')
+    return rows
+      .filter(e => !e.sectionType || e.sectionType === sectionType)
+      .map(toKnowledgeEntry)
+  }
   return (knowledgeEntries.get(projectId) || [])
     .filter(e => e.type === 'viewpoint' && (!e.sectionType || e.sectionType === sectionType))
 }
 
-export function clearProjectEntries(projectId: string): void {
+export async function clearProjectEntries(projectId: string): Promise<void> {
+  if (DB_ENABLED) {
+    await knowledgeRepo.deleteByProject(projectId)
+    return
+  }
   knowledgeEntries.delete(projectId)
 }

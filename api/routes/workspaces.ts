@@ -1,26 +1,33 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import * as workspaceService from '../services/workspaceService.js'
 import * as projectService from '../services/projectService.js'
 
 const router = Router()
 
-router.get('/', (req, res) => {
-  const workspaces = workspaceService.getWorkspaces()
-  res.json({ success: true, data: workspaces })
+const paginationQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
 })
 
-router.post('/', (req, res) => {
+router.get('/', async (req, res) => {
+  const query = paginationQuerySchema.parse(req.query)
+  const result = await workspaceService.getWorkspaces(query)
+  res.json({ success: true, data: result.data, pagination: result.pagination })
+})
+
+router.post('/', async (req, res) => {
   const { name, description, settings } = req.body
   if (!name?.trim()) {
     res.status(400).json({ success: false, error: 'Workspace name is required' })
     return
   }
-  const workspace = workspaceService.createWorkspace(name.trim(), description, settings)
+  const workspace = await workspaceService.createWorkspace(name.trim(), description, settings)
   res.status(201).json({ success: true, data: workspace })
 })
 
-router.get('/:id', (req, res) => {
-  const workspace = workspaceService.getWorkspace(req.params.id)
+router.get('/:id', async (req, res) => {
+  const workspace = await workspaceService.getWorkspace(req.params.id)
   if (!workspace) {
     res.status(404).json({ success: false, error: 'Workspace not found' })
     return
@@ -28,9 +35,9 @@ router.get('/:id', (req, res) => {
   res.json({ success: true, data: workspace })
 })
 
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   const { name, description, settings } = req.body
-  const workspace = workspaceService.updateWorkspace(req.params.id, { name, description, settings })
+  const workspace = await workspaceService.updateWorkspace(req.params.id, { name, description, settings })
   if (!workspace) {
     res.status(404).json({ success: false, error: 'Workspace not found' })
     return
@@ -38,8 +45,8 @@ router.put('/:id', (req, res) => {
   res.json({ success: true, data: workspace })
 })
 
-router.delete('/:id', (req, res) => {
-  const deleted = workspaceService.deleteWorkspace(req.params.id)
+router.delete('/:id', async (req, res) => {
+  const deleted = await workspaceService.deleteWorkspace(req.params.id)
   if (!deleted) {
     res.status(404).json({ success: false, error: 'Workspace not found' })
     return
@@ -47,28 +54,28 @@ router.delete('/:id', (req, res) => {
   res.json({ success: true, message: 'Workspace deleted' })
 })
 
-router.get('/:id/projects', (req, res) => {
-  const workspace = workspaceService.getWorkspace(req.params.id)
+router.get('/:id/projects', async (req, res) => {
+  const workspace = await workspaceService.getWorkspace(req.params.id)
   if (!workspace) {
     res.status(404).json({ success: false, error: 'Workspace not found' })
     return
   }
-  const projects = workspaceService.getWorkspaceProjects(req.params.id)
+  const projects = await workspaceService.getWorkspaceProjects(req.params.id)
   res.json({ success: true, data: projects })
 })
 
-router.post('/:id/projects', (req, res) => {
+router.post('/:id/projects', async (req, res) => {
   const { topic, title, description, language } = req.body
   if (!topic?.trim()) {
     res.status(400).json({ success: false, error: 'Topic is required' })
     return
   }
-  const workspace = workspaceService.getWorkspace(req.params.id)
+  const workspace = await workspaceService.getWorkspace(req.params.id)
   if (!workspace) {
     res.status(404).json({ success: false, error: 'Workspace not found' })
     return
   }
-  const project = projectService.createProject(
+  const project = await projectService.createProject(
     topic.trim(),
     title,
     description,

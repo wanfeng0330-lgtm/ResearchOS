@@ -4,9 +4,12 @@ import express, {
   type NextFunction,
 } from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import multer from 'multer'
 import { join } from 'path'
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
+import swaggerUi from 'swagger-ui-express'
 import projectRoutes from './routes/projects.js'
 import searchRoutes from './routes/search.js'
 import generateRoutes from './routes/generate.js'
@@ -16,13 +19,58 @@ import workspaceRoutes from './routes/workspaces.js'
 import knowledgeBaseRoutes from './routes/knowledgeBase.js'
 import citationChainRoutes from './routes/citationChain.js'
 import workflowRoutes from './routes/workflow.js'
+import authRoutes from './routes/auth.js'
 import streamRoutes, { broadcastToProject } from './routes/stream.js'
+import { DB_ENABLED } from './db/index.js'
 
 export { broadcastToProject }
 
 const app: express.Application = express()
 
-app.use(cors())
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}))
+
+// CORS - allow frontend origin
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  'http://localhost:3001',
+]
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    // In production, reject unknown origins; in dev, allow all
+    if (process.env.NODE_ENV === 'production') {
+      return callback(new Error('Not allowed by CORS'))
+    }
+    callback(null, true)
+  },
+  credentials: true,
+}))
+
+// Rate limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  message: { success: false, error: 'Too many requests, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { success: false, error: 'Too many authentication attempts' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+app.use('/api/', apiLimiter)
+app.use('/api/auth/login', authLimiter)
+app.use('/api/auth/register', authLimiter)
+
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
@@ -49,6 +97,22 @@ app.post('/api/upload/image', upload.single('image'), (req: Request, res: Respon
   res.json({ success: true, data: { url, filename: req.file.filename } })
 })
 
+// Swagger API docs
+try {
+  const openapiPath = join(process.cwd(), 'api', 'docs', 'openapi.json')
+  if (existsSync(openapiPath)) {
+    const openapiDoc = JSON.parse(readFileSync(openapiPath, 'utf-8'))
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapiDoc, {
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'ResearchFlow API Documentation',
+    }))
+  }
+} catch { /* swagger setup failed silently */ }
+
+// Auth routes
+app.use('/api/auth', authRoutes)
+
+// Protected and public routes
 app.use('/api/projects', projectRoutes)
 app.use('/api/search', searchRoutes)
 app.use('/api/generate', generateRoutes)
@@ -60,28 +124,46 @@ app.use('/api/projects/:projectId/citation-chain', citationChainRoutes)
 app.use('/api/projects/:projectId/workflow', workflowRoutes)
 app.use('/api/stream', streamRoutes)
 
-app.use(
-  '/api/health',
-  (req: Request, res: Response, next: NextFunction): void => {
-    res.status(200).json({
-      success: true,
-      message: 'ok',
-    })
-  },
-)
+// Health check with dependency status
+app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
+  const health: Record<string, unknown> = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    database: { enabled: DB_ENABLED, status: 'unknown' },
+  }
 
-app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+  if (DB_ENABLED) {
+    try {
+      // Use a simple query to check DB connectivity
+      const { db } = await import('./db/index.js')
+      await db.execute('SELECT 1')
+      health.database = { enabled: true, status: 'connected' }
+    } catch {
+      health.database = { enabled: true, status: 'disconnected' }
+      health.status = 'degraded'
+    }
+  } else {
+    health.database = { enabled: false, status: 'disabled (using in-memory)' }
+  }
+
+  const statusCode = (health.status === 'ok' || process.env.NODE_ENV !== 'production') ? 200 : 503
+  res.status(statusCode).json({ success: true, data: health })
+})
+
+// Error handling
+app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => { // eslint-disable-line @typescript-eslint/no-unused-vars
   console.error('Unhandled error:', error)
   res.status(500).json({
     success: false,
-    error: 'Server internal error',
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message,
   })
 })
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({
     success: false,
-    error: 'API not found',
+    error: `API not found: ${req.method} ${req.path}`,
   })
 })
 

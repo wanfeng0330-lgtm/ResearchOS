@@ -7,12 +7,20 @@ const sourceLabels: Record<Paper["source"], string> = {
   arxiv: "arXiv",
   semantic_scholar: "Semantic Scholar",
   crossref: "CrossRef",
+  openalex: "OpenAlex",
+  pubmed: "PubMed",
+  biorxiv: "bioRxiv",
+  unpaywall: "Unpaywall",
 };
 
 const sourceColors: Record<Paper["source"], string> = {
   arxiv: "bg-red-50 text-red-600 border-red-200",
   semantic_scholar: "bg-blue-50 text-blue-600 border-blue-200",
   crossref: "bg-purple-50 text-purple-600 border-purple-200",
+  openalex: "bg-green-50 text-green-600 border-green-200",
+  pubmed: "bg-orange-50 text-orange-600 border-orange-200",
+  biorxiv: "bg-amber-50 text-amber-600 border-amber-200",
+  unpaywall: "bg-teal-50 text-teal-600 border-teal-200",
 };
 
 interface PaperCardProps {

@@ -24,14 +24,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const project = projectService.getProject(projectId)
+  const project = await projectService.getProject(projectId)
   if (!project) {
     res.status(404).json({ success: false, error: 'Project not found' })
     return
   }
 
-  const sections = projectService.getGeneratedSections(projectId)
-  const references = projectService.getReferences(projectId)
+  const sections = await projectService.getGeneratedSections(projectId)
+  const references = await projectService.getReferences(projectId)
   const allCharts = sections.flatMap(s => s.charts || [])
   const charts = includeCharts === false ? [] : allCharts
   const exportSections = includeCharts === false
@@ -44,7 +44,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     return
   }
 
-  const exportJob = projectService.createExportJob(projectId, format, citationFormat)
+  const exportJob = await projectService.createExportJob(projectId, format, citationFormat)
 
   try {
     let filePath: string | undefined
@@ -77,7 +77,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     const fileName = filePath ? path.basename(filePath) : undefined
 
-    projectService.updateExportJob(exportJob.id, {
+    await projectService.updateExportJob(exportJob.id, {
       status: 'completed',
       downloadUrl: `/api/export/${exportJob.id}/download`,
       fileName,
@@ -95,7 +95,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       },
     })
   } catch (error) {
-    projectService.updateExportJob(exportJob.id, {
+    await projectService.updateExportJob(exportJob.id, {
       status: 'failed',
     })
     res.status(500).json({
@@ -105,8 +105,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 })
 
-router.get('/:jobId/download', (req: Request, res: Response): void => {
-  const job = projectService.getExportJob(req.params.jobId)
+router.get('/:jobId/download', async (req: Request, res: Response): Promise<void> => {
+  const job = await projectService.getExportJob(req.params.jobId)
 
   if (!job) {
     res.status(404).json({ success: false, error: 'Export job not found' })
