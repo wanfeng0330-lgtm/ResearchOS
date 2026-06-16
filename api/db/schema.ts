@@ -93,7 +93,7 @@ export const generatedSections = pgTable('generated_sections', {
   index('idx_sections_project').on(table.projectId),
 ])
 
-export const references = pgTable('references', {
+export const paperReferences = pgTable('paper_references', {
   id: uuid('id').primaryKey().defaultRandom(),
   projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   paperId: uuid('paper_id').references(() => papers.id),

@@ -21,7 +21,7 @@ import citationChainRoutes from './routes/citationChain.js'
 import workflowRoutes from './routes/workflow.js'
 import authRoutes from './routes/auth.js'
 import streamRoutes, { broadcastToProject } from './routes/stream.js'
-import { DB_ENABLED } from './db/index.js'
+import { SUPABASE_ENABLED } from './db/supabaseClient.js'
 
 export { broadcastToProject }
 
@@ -130,15 +130,14 @@ app.get('/api/health', async (_req: Request, res: Response): Promise<void> => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    database: { enabled: DB_ENABLED, status: 'unknown' },
+    database: { enabled: SUPABASE_ENABLED, status: 'unknown' },
   }
 
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     try {
-      // Use a simple query to check DB connectivity
-      const { db } = await import('./db/index.js')
-      await db.execute('SELECT 1')
-      health.database = { enabled: true, status: 'connected' }
+      const { supabase } = await import('./db/supabaseClient.js')
+      const { error } = await supabase.from('workspaces').select('id').limit(1)
+      health.database = { enabled: true, status: error ? 'error' : 'connected' }
     } catch {
       health.database = { enabled: true, status: 'disconnected' }
       health.status = 'degraded'

@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { v4 as uuidv4 } from 'uuid'
-import { DB_ENABLED } from '../db/index.js'
-import { userRepo } from '../db/repository.js'
+import { SUPABASE_ENABLED } from '../db/supabaseClient.js'
+import { userRepo } from '../db/supabaseRepository.js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production'
 const BCRYPT_ROUNDS = 10
@@ -30,7 +30,7 @@ export async function register(email: string, password: string, name?: string): 
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
 
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const existing = await userRepo.findByEmail(email)
     if (existing) throw new Error('Email already registered')
     const user = await userRepo.create({ email, passwordHash, name: name || '' })
@@ -55,7 +55,7 @@ export async function login(email: string, password: string): Promise<{ token: s
 
   let user: { id: string; email: string; passwordHash: string; name: string; role: string } | null = null
 
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const dbUser = await userRepo.findByEmail(email)
     if (!dbUser) throw new Error('Invalid email or password')
     user = dbUser
@@ -78,7 +78,7 @@ export async function login(email: string, password: string): Promise<{ token: s
 }
 
 export async function getUserById(id: string): Promise<{ id: string; email: string; name: string; role: string } | null> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const user = await userRepo.findById(id)
     if (!user) return null
     return { id: user.id, email: user.email, name: user.name, role: user.role }

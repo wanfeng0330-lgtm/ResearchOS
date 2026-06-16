@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { KnowledgeEntry } from '../../shared/types.js'
-import { DB_ENABLED } from '../db/index.js'
-import { knowledgeRepo } from '../db/repository.js'
+import { SUPABASE_ENABLED } from '../db/supabaseClient.js'
+import { knowledgeRepo } from '../db/supabaseRepository.js'
 
 // In-memory fallback storage (used when DB is disabled)
 const knowledgeEntries = new Map<string, KnowledgeEntry[]>()
@@ -20,7 +20,7 @@ function toKnowledgeEntry(row: any): KnowledgeEntry {
 }
 
 export async function getEntries(projectId: string): Promise<KnowledgeEntry[]> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const rows = await knowledgeRepo.findByProject(projectId)
     return rows.map(toKnowledgeEntry)
   }
@@ -28,7 +28,7 @@ export async function getEntries(projectId: string): Promise<KnowledgeEntry[]> {
 }
 
 export async function getEntriesByType(projectId: string, type: KnowledgeEntry['type']): Promise<KnowledgeEntry[]> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const rows = await knowledgeRepo.findByType(projectId, type)
     return rows.map(toKnowledgeEntry)
   }
@@ -36,7 +36,7 @@ export async function getEntriesByType(projectId: string, type: KnowledgeEntry['
 }
 
 export async function addEntry(projectId: string, type: KnowledgeEntry['type'], content: string, sourcePaperIds: string[] = [], sectionType?: string): Promise<KnowledgeEntry> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const row = await knowledgeRepo.create({ projectId, type, content, sourcePaperIds, sectionType })
     return toKnowledgeEntry(row)
   }
@@ -68,7 +68,7 @@ export async function addSummary(projectId: string, paperId: string, content: st
 }
 
 export async function getSummary(projectId: string, paperId: string): Promise<KnowledgeEntry | null> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const rows = await knowledgeRepo.findByType(projectId, 'summary')
     const match = rows.find(e => (e.sourcePaperIds || []).includes(paperId))
     return match ? toKnowledgeEntry(match) : null
@@ -81,7 +81,7 @@ export async function addNote(projectId: string, content: string, sourcePaperIds
 }
 
 export async function deleteEntry(projectId: string, entryId: string): Promise<boolean> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     return knowledgeRepo.delete(entryId)
   }
   const entries = knowledgeEntries.get(projectId) || []
@@ -92,7 +92,7 @@ export async function deleteEntry(projectId: string, entryId: string): Promise<b
 }
 
 export async function getViewpointsBySectionType(projectId: string, sectionType: string): Promise<KnowledgeEntry[]> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const rows = await knowledgeRepo.findByType(projectId, 'viewpoint')
     return rows
       .filter(e => !e.sectionType || e.sectionType === sectionType)
@@ -103,7 +103,7 @@ export async function getViewpointsBySectionType(projectId: string, sectionType:
 }
 
 export async function clearProjectEntries(projectId: string): Promise<void> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     await knowledgeRepo.deleteByProject(projectId)
     return
   }

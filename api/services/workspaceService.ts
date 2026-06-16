@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { Workspace, WorkspaceSettings, Project, PaginationParams, PaginatedResult } from '../../shared/types.js'
 import * as projectService from './projectService.js'
-import { workspaceRepo, projectRepo } from '../db/repository.js'
+import { SUPABASE_ENABLED } from '../db/supabaseClient.js'
+import { workspaceRepo, projectRepo } from '../db/supabaseRepository.js'
 
-const DB_ENABLED = process.env.DB_ENABLED !== 'false'
+const DB_ENABLED = SUPABASE_ENABLED
 
 const DEFAULT_SETTINGS: WorkspaceSettings = {
   defaultCitationFormat: 'gbt',

@@ -1,15 +1,13 @@
 import { v4 as uuidv4 } from 'uuid'
-import { eq } from 'drizzle-orm'
 import type { Project, Paper, GeneratedSection, ExportJob, GenerationProgress, SectionConfig, Reference, PaginationParams, PaginatedResult } from '../../shared/types.js'
-import db, { DB_ENABLED } from '../db/index.js'
-import * as schema from '../db/schema.js'
+import { SUPABASE_ENABLED } from '../db/supabaseClient.js'
 import {
   projectRepo,
   paperRepo,
   sectionRepo,
   referenceRepo,
   exportJobRepo,
-} from '../db/repository.js'
+} from '../db/supabaseRepository.js'
 
 let _addProjectToWorkspace: ((workspaceId: string, projectId: string) => boolean | Promise<boolean>) | null = null
 
@@ -118,7 +116,7 @@ export async function createProject(
   language: 'en' | 'zh' = 'en',
   workspaceId?: string
 ): Promise<Project> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const result = await projectRepo.create({
       title: title || topic,
       topic,
@@ -160,7 +158,7 @@ export async function getProjects(pagination?: PaginationParams): Promise<Pagina
   const limit = pagination?.limit ?? 20
   const offset = (page - 1) * limit
 
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const { rows, total } = await projectRepo.findAllPaginated(limit, offset)
     return {
       data: rows.map(dbProjectToModel),
@@ -177,7 +175,7 @@ export async function getProjects(pagination?: PaginationParams): Promise<Pagina
 }
 
 export async function getProject(id: string): Promise<Project | null> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const result = await projectRepo.findById(id)
     return result ? dbProjectToModel(result) : null
   }
@@ -185,7 +183,7 @@ export async function getProject(id: string): Promise<Project | null> {
 }
 
 export async function updateProjectStatus(id: string, status: Project['status']): Promise<void> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     await projectRepo.updateStatus(id, status)
     return
   }
@@ -197,7 +195,7 @@ export async function updateProjectStatus(id: string, status: Project['status'])
 }
 
 export async function updateProject(id: string, updates: Partial<Omit<Project, 'id' | 'createdAt'>>): Promise<Project | null> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const updateData: Record<string, any> = { ...updates, updatedAt: new Date() }
     const [result] = await db.update(schema.projects)
       .set(updateData)
@@ -214,7 +212,7 @@ export async function updateProject(id: string, updates: Partial<Omit<Project, '
 // ==================== Keywords Functions ====================
 
 export async function setKeywords(projectId: string, keywords: string[]): Promise<void> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     await projectRepo.updateKeywords(projectId, keywords)
     return
   }
@@ -227,7 +225,7 @@ export async function setKeywords(projectId: string, keywords: string[]): Promis
 }
 
 export async function getKeywords(projectId: string): Promise<string[]> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const project = await projectRepo.findById(projectId)
     return project?.keywords ?? []
   }
@@ -237,7 +235,7 @@ export async function getKeywords(projectId: string): Promise<string[]> {
 // ==================== Papers Functions ====================
 
 export async function addPapers(projectId: string, newPapers: Paper[]): Promise<void> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     for (const paper of newPapers) {
       await paperRepo.create({
         projectId,
@@ -269,7 +267,7 @@ export async function addPapers(projectId: string, newPapers: Paper[]): Promise<
 }
 
 export async function getPapers(projectId: string): Promise<Paper[]> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const results = await paperRepo.findByProject(projectId)
     return results.map(dbPaperToModel)
   }
@@ -277,7 +275,7 @@ export async function getPapers(projectId: string): Promise<Paper[]> {
 }
 
 export async function togglePaperSelection(projectId: string, paperId: string): Promise<void> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const results = await paperRepo.findByProject(projectId)
     const paper = results.find((p) => p.id === paperId)
     if (paper) {
@@ -292,7 +290,7 @@ export async function togglePaperSelection(projectId: string, paperId: string): 
 }
 
 export async function selectPapersByIds(projectId: string, paperIds: string[]): Promise<void> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const results = await paperRepo.findByProject(projectId)
     for (const paper of results) {
       const selected = paperIds.includes(paper.id)
@@ -310,7 +308,7 @@ export async function selectPapersByIds(projectId: string, paperIds: string[]): 
 }
 
 export async function getSelectedPapers(projectId: string): Promise<Paper[]> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const results = await paperRepo.findSelected(projectId)
     return results.map(dbPaperToModel)
   }
@@ -320,7 +318,7 @@ export async function getSelectedPapers(projectId: string): Promise<Paper[]> {
 // ==================== Sections Functions ====================
 
 export async function setGeneratedSections(projectId: string, newSections: GeneratedSection[]): Promise<void> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     await sectionRepo.replaceAll(projectId, newSections.map((s, i) => ({
       type: s.type,
       title: s.title,
@@ -336,7 +334,7 @@ export async function setGeneratedSections(projectId: string, newSections: Gener
 }
 
 export async function getGeneratedSections(projectId: string): Promise<GeneratedSection[]> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const results = await sectionRepo.findByProject(projectId)
     return results.map(dbSectionToModel)
   }
@@ -357,7 +355,7 @@ export async function getSectionConfig(projectId: string): Promise<SectionConfig
 // ==================== References Functions ====================
 
 export async function setReferences(projectId: string, refs: Reference[]): Promise<void> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     await referenceRepo.replaceAll(projectId, refs.map((r) => ({
       paperId: r.paperId || undefined,
       bibtex: r.bibtex,
@@ -371,7 +369,7 @@ export async function setReferences(projectId: string, refs: Reference[]): Promi
 }
 
 export async function getReferences(projectId: string): Promise<Reference[]> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const results = await referenceRepo.findByProject(projectId)
     return results.map(dbReferenceToModel)
   }
@@ -385,7 +383,7 @@ export async function createExportJob(
   format: ExportJob['format'],
   citationFormat: ExportJob['citationFormat']
 ): Promise<ExportJob> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const result = await exportJobRepo.create({
       projectId,
       format,
@@ -409,7 +407,7 @@ export async function createExportJob(
 }
 
 export async function updateExportJob(id: string, updates: Partial<ExportJob>): Promise<void> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const updateData: Record<string, any> = {}
     if (updates.status) updateData.status = updates.status
     if (updates.fileName) updateData.filePath = updates.fileName
@@ -421,7 +419,7 @@ export async function updateExportJob(id: string, updates: Partial<ExportJob>): 
 }
 
 export async function getExportJob(id: string): Promise<ExportJob | null> {
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     const result = await exportJobRepo.findById(id)
     return result ? dbExportJobToModel(result) : null
   }
@@ -461,7 +459,7 @@ export async function clearStepDataAfter(projectId: string, afterStep: number): 
     stepDataMap.get(projectId)?.delete(stepNames[i])
   }
 
-  if (DB_ENABLED) {
+  if (SUPABASE_ENABLED) {
     // Clear database records based on step
     if (afterStep <= 4) {
       await sectionRepo.replaceAll(projectId, [])
